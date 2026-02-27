@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Terminal Escape</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+        }
+
+        body {
+            background-color: black;
+            color: #10b981; /* emerald-500 */
+            font-family: var(--font-mono);
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .crt-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 50;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%,
+                rgba(0, 0, 0, 0.25) 50%
+            ),
+            linear-gradient(
+                90deg,
+                rgba(255, 0, 0, 0.06),
+                rgba(0, 255, 0, 0.02),
+                rgba(0, 0, 255, 0.06)
+            );
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0) 0%,
+                rgba(255, 255, 255, 0.2) 10%,
+                rgba(0, 0, 0, 0.1) 100%
+            );
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 6s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            80% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+
+        .flicker {
+            animation: flicker 0.15s infinite;
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            5% { opacity: 0.95; }
+            10% { opacity: 0.9; }
+            15% { opacity: 0.95; }
+            20% { opacity: 0.98; }
+            25% { opacity: 0.95; }
+            30% { opacity: 0.9; }
+            35% { opacity: 0.95; }
+            40% { opacity: 0.98; }
+            45% { opacity: 1; }
+            50% { opacity: 0.98; }
+            55% { opacity: 0.95; }
+            60% { opacity: 0.9; }
+            65% { opacity: 0.95; }
+            70% { opacity: 0.98; }
+            75% { opacity: 0.95; }
+            80% { opacity: 0.9; }
+            85% { opacity: 0.95; }
+            90% { opacity: 0.98; }
+            95% { opacity: 0.95; }
+            100% { opacity: 0.98; }
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom": "https://esm.sh/react-dom@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "framer-motion": "https://esm.sh/framer-motion@10.16.4?external=react,react-dom",
+        "lucide-react": "https://esm.sh/lucide-react@0.284.0?external=react"
+      }
+    }
+    </script>
+
+    <script type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import ReactDOM from 'react-dom/client';
+        import { motion, AnimatePresence } from 'framer-motion';
+        import { 
+            Terminal, Lock, Unlock, AlertCircle, Monitor, 
+            Cpu, Database, ShieldAlert, ChevronRight, Power, Info 
+        } from 'lucide-react';
+
+        const CORRECT_PASSWORD = "HAYES";
+
+        const GENERATED_LOGS = [
+            "ACCESS GRANTED. INITIALIZING DECRYPTION PROTOCOL...",
+            "BYPASSING SECURITY LAYER 1: FIREWALL... [SUCCESS]",
+            "BYPASSING SECURITY LAYER 2: ENCRYPTION... [SUCCESS]",
+            "BYPASSING SECURITY LAYER 3: BIOMETRIC... [SUCCESS]",
+            "MOUNTING VIRTUAL DRIVE /dev/sda1...",
+            "DECRYPTING SECTOR 0x0001... OK",
+            "DECRYPTING SECTOR 0x0002... OK",
+            "DECRYPTING SECTOR 0x0003... OK",
+            "DECRYPTING SECTOR 0x0004... OK",
+            "DECRYPTING SECTOR 0x0005... OK",
+            "DECRYPTING SECTOR 0x0006... OK",
+            "DECRYPTING SECTOR 0x0007... OK",
+            "DECRYPTING SECTOR 0x0008... OK",
+            "DECRYPTING SECTOR 0x0009... OK",
+            "DECRYPTING SECTOR 0x000A... OK",
+            "DECRYPTING SECTOR 0x000B... OK",
+            "DECRYPTING SECTOR 0x000C... OK",
+            "LOADING NEURAL INTERFACE MODULES...",
+            "0x7FFD1A2B3C4D: STACK POINTER ALIGNED",
+            "0x7FFD1A2B3C4E: HEAP ALLOCATION SUCCESSFUL",
+            "0x7FFD1A2B3C4F: KERNEL SYMBOLS LOADED",
+            "ESTABLISHING HANDSHAKE WITH QUANTUM ARRAY...",
+            "Pinging 127.0.0.1 with 32 bytes of data:",
+            "Reply from 127.0.0.1: bytes=32 time<1ms TTL=128",
+            "Reply from 127.0.0.1: bytes=32 time<1ms TTL=128",
+            "Reply from 127.0.0.1: bytes=32 time<1ms TTL=128",
+            "Reply from 127.0.0.1: bytes=32 time<1ms TTL=128",
+            "SYNCHRONIZING CONSCIOUSNESS STREAM...",
+            "PROGRESS: [##########----------] 50%",
+            "PROGRESS: [###############-----] 75%",
+            "PROGRESS: [####################] 100%",
+            "DOWNLOADING PROJECT: NEON-7 ASSETS...",
+            "FILE: core_logic.bin ... [DONE]",
+            "FILE: neural_map.dat ... [DONE]",
+            "FILE: security_override.sh ... [DONE]",
+            "FILE: user_profile_admin.json ... [DONE]",
+            "WARNING: DATA INTEGRITY AT 98.4%",
+            "FINALIZING SYSTEM INITIALIZATION...",
+            "SYSTEM READY. WELCOME, ADMIN."
+        ];
+
+        const ROLE_INCENTIVES = [
+            { role: "CEO", incentive: "Power" },
+            { role: "Secretary", incentive: "Access" },
+            { role: "R&D", incentive: "Hope" },
+            { role: "Director", incentive: "Capital" },
+            { role: "Scientist", incentive: "Breakthrough" },
+            { role: "Body Guard", incentive: "Control" }
+        ];
+
+        function App() {
+            const [password, setPassword] = useState('');
+            const [isUnlocked, setIsUnlocked] = useState(false);
+            const [error, setError] = useState(false);
+            const [booting, setBooting] = useState(false);
+            const [bootLogs, setBootLogs] = useState([]);
+            const [showHint, setShowHint] = useState(false);
+            const [activeTab, setActiveTab] = useState('profiles'); // 'profiles' or 'matrix'
+            const inputRef = useRef(null);
+            const scrollRef = useRef(null);
+
+            const personnel = [
+                { 
+                    id: 1, 
+                    name: "WILLIAM HARPER", 
+                    tagline: "The Visionary Who Fears Death",
+                    description: "CEO ผู้สร้างอาณาจักรเทคโนโลยีสุขภาพระดับประเทศ ชายผู้ถูกยกย่องว่าเป็นผู้เปลี่ยนอนาคตมนุษยชาติ",
+                    details: "แต่เบื้องหลังความสำเร็จ เขากำลังต่อสู้กับโรคที่ไม่มีทางรักษา Project นี้ ไม่ใช่แค่นวัตกรรม มันคือโอกาสสุดท้ายของเขา",
+                    projectInfo: "",
+                    quote: "If I can rewrite life... I don't have to lose mine.",
+                    img: "1.jpg"
+                },
+                { 
+                    id: 2, 
+                    name: "MADISON CLARKE", 
+                    tagline: "The Keeper of Secrets",
+                    description: "เลขานุการที่รู้ทุกอย่าง เห็นทุกเอกสาร เข้าถึงทุกความลับ ตัวตนที่มิอาจล่วงรู้",
+                    details: "เธอไม่ได้สร้างโครงการแต่เธอรู้ว่าใครทำอะไร และเธอรู้ว่า… บางไฟล์ควรถูกลบ",
+                    projectInfo: "",
+                    quote: "Some truths are too expensive to survive.",
+                    img: "2.jpg" 
+                },
+                { 
+                    id: 3, 
+                    name: "VICTORIA PARK", 
+                    tagline: "The Scientist Who Crossed the Line",
+                    description: "อัจฉริยะด้านชีววิทยาประสาทผู้พัฒนา Neural Implant รุ่นแรก",
+                    details: "เธอเชื่อว่าวิทยาศาสตร์สามารถเอาชนะความตายได้ แต่เมื่อคนที่เธอรักกำลังจะจากไป เส้นแบ่งระหว่างจริยธรรมและความหวังเริ่มเลือนหาย",
+                    projectInfo: "",
+                    quote: "If it saves him… it’s worth the risk.",
+                    img: "3.jpg" 
+                },
+                { 
+                    id: 4, 
+                    name: "JASON KIM", 
+                    tagline: "The Architect of Evolution",
+                    description: "Director ผู้มองเห็นมนุษย์เป็นเพียงเวอร์ชันที่ยังไม่สมบูรณ์ ซึ่งมีความเป็นไปได้ว่าเป็นคนสนิทกับท่านผู้นั้น",
+                    details: "สำหรับเขา Aeternum ไม่ใช่การรักษา แต่มันคือการ “อัปเกรด” เขาเชื่อว่ามนุษย์ควรถูกพัฒนาแม้จะต้องแลกด้วยอะไรบางอย่าง",
+                    projectInfo: "",
+                    quote: "Evolution never asked for permission.",
+                    img: "4.jpg" 
+                },
+                { 
+                    id: 5, 
+                    name: "MARTIN JEONG", 
+                    tagline: "The Mind Behind the Code",
+                    description: "หัวหน้า R&D ผู้ตั้งชื่อ Project Aeternum",
+                    details: "เขาไม่ต้องการเงิน ไม่ต้องการอำนาจ เขาต้องการให้ชื่อของเขา ถูกจารึกในประวัติศาสตร์วิทยาศาสตร์ แม้ผลลัพธ์จะเกินกว่าที่ใครควบคุมได้",
+                    projectInfo: "",
+                    quote: "Greatness requires sacrifice.",
+                    img: "5.jpg" 
+                },
+                { 
+                    id: 6, 
+                    name: "CULLEN HAYES", 
+                    tagline: "The Man Who Shouldn’t Exist",
+                    description: "หัวหน้าหน่วยรักษาความปลอดภัย ผู้เงียบที่สุดในห้อง ไม่มีอดีตก่อน 8 ปี ไม่มีประวัติที่ตรวจสอบได้",
+                    details: "แต่ระบบตรวจพบสัญญาณ Neural Sync ตรงกับ Prototype รุ่นแรก เขาไม่ได้แค่ปกป้องความลับ เขาคือผลลัพธ์ของมัน",
+                    projectInfo: "",
+                    quote: "I am not protecting the project… I am the project.",
+                    img: "6.jpg" 
+                }
+            ];
+
+            useEffect(() => {
+                if (booting) {
+                    let i = 0;
+                    const interval = setInterval(() => {
+                        if (i < GENERATED_LOGS.length) {
+                            setBootLogs(prev => [...prev, GENERATED_LOGS[i]]);
+                            i++;
+                        } else {
+                            clearInterval(interval);
+                            setTimeout(() => {
+                                setIsUnlocked(true);
+                                setBooting(false);
+                            }, 800);
+                        }
+                    }, 50);
+                    return () => clearInterval(interval);
+                }
+            }, [booting]);
+
+            useEffect(() => {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                }
+            }, [bootLogs]);
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (password.toUpperCase() === CORRECT_PASSWORD) {
+                    setBootLogs([]);
+                    setBooting(true);
+                    setError(false);
+                } else {
+                    setError(true);
+                    setPassword('');
+                    setTimeout(() => setError(false), 500);
+                }
+            };
+
+            const focusInput = () => {
+                inputRef.current?.focus();
+            };
+
+            if (booting) {
+                return React.createElement('div', { className: "min-h-screen bg-black flex flex-col p-8 md:p-16 relative overflow-hidden" },
+                    React.createElement('div', { className: "crt-overlay" }),
+                    React.createElement('div', { className: "scanline" }),
+                    React.createElement('div', { 
+                        ref: scrollRef,
+                        className: "max-w-4xl w-full mx-auto space-y-2 overflow-y-auto max-h-screen scrollbar-hide"
+                    },
+                        bootLogs.map((log, index) => 
+                            React.createElement(motion.div, {
+                                key: index,
+                                initial: { opacity: 0, x: -10 },
+                                animate: { opacity: 1, x: 0 },
+                                className: `text-sm md:text-base ${
+                                    !log ? 'text-emerald-500' :
+                                    (log.includes('WARNING') || log.includes('ERROR')) ? 'text-red-500' : 
+                                    log.includes('SUCCESS') ? 'text-blue-400' : 
+                                    'text-emerald-500'
+                                }`
+                            },
+                                React.createElement('span', { className: "opacity-50 mr-2 text-[10px]" }, `[${new Date().toLocaleTimeString()}]`),
+                                log
+                            )
+                        ),
+                        React.createElement(motion.div, {
+                            animate: { opacity: [0, 1] },
+                            transition: { repeat: Infinity, duration: 0.8 },
+                            className: "w-2 h-5 bg-emerald-500 inline-block align-middle ml-1"
+                        })
+                    )
+                );
+            }
+
+            return React.createElement('div', { 
+                className: "min-h-screen bg-black flex items-center justify-center p-4 relative overflow-hidden",
+                onClick: focusInput
+            },
+                React.createElement('div', { className: "crt-overlay" }),
+                React.createElement('div', { className: "scanline" }),
+                React.createElement(AnimatePresence, { mode: "wait" },
+                    !isUnlocked ? (
+                        React.createElement(motion.div, {
+                            key: "login",
+                            initial: { opacity: 0, scale: 0.9 },
+                            animate: { opacity: 1, scale: 1 },
+                            exit: { opacity: 0, scale: 1.1, filter: 'blur(10px)' },
+                            className: "w-full max-w-md bg-zinc-900/50 border border-emerald-500/30 p-8 rounded-lg backdrop-blur-sm relative z-10"
+                        },
+                            React.createElement('div', { className: "flex justify-center mb-8" },
+                                React.createElement('div', { className: "relative" },
+                                    React.createElement(motion.div, {
+                                        animate: error ? { x: [-10, 10, -10, 10, 0] } : {},
+                                        className: `p-4 rounded-full border-2 ${error ? 'border-red-500 text-red-500' : 'border-emerald-500 text-emerald-500'}`
+                                    },
+                                        React.createElement(Lock, { size: 48, className: error ? 'flicker' : '' })
+                                    ),
+                                    error && React.createElement(motion.div, {
+                                        initial: { opacity: 0 },
+                                        animate: { opacity: 1 },
+                                        className: "absolute -top-2 -right-2 bg-red-500 text-black p-1 rounded-full"
+                                    },
+                                        React.createElement(ShieldAlert, { size: 20 })
+                                    )
+                                )
+                            ),
+                            React.createElement('div', { className: "text-center mb-8" },
+                                React.createElement('h1', { className: "text-2xl font-bold tracking-widest uppercase mb-2" }, "System Locked"),
+                                React.createElement('p', { className: "text-emerald-500/60 text-xs uppercase tracking-tighter" }, "Unauthorized access is strictly prohibited")
+                            ),
+                            React.createElement('form', { onSubmit: handleLogin, className: "space-y-6" },
+                                React.createElement('div', { className: "relative" },
+                                    React.createElement('div', { className: "absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none" },
+                                        React.createElement(ChevronRight, { size: 18, className: "text-emerald-500/50" })
+                                    ),
+                                    React.createElement('input', {
+                                        ref: inputRef,
+                                        type: "text",
+                                        value: password,
+                                        onChange: (e) => setPassword(e.target.value),
+                                        className: `w-full bg-black border ${error ? 'border-red-500' : 'border-emerald-500/30'} text-emerald-500 p-3 pl-10 rounded focus:outline-none focus:border-emerald-500 transition-colors uppercase tracking-[0.5em] text-center`,
+                                        placeholder: "ENTER CODE",
+                                        autoFocus: true,
+                                        autoComplete: "off"
+                                    })
+                                ),
+                                React.createElement('button', {
+                                    type: "submit",
+                                    className: "w-full bg-emerald-500 text-black font-bold py-3 rounded hover:bg-emerald-400 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 group"
+                                },
+                                    React.createElement(Power, { size: 18, className: "group-hover:rotate-12 transition-transform" }),
+                                    "Initialize Access"
+                                )
+                            ),
+                            React.createElement('div', { className: "mt-8 flex justify-between items-center text-[10px] text-emerald-500/40 uppercase tracking-widest" },
+                                React.createElement('div', { className: "flex items-center gap-1" },
+                                    React.createElement(Monitor, { size: 12 }),
+                                    React.createElement('span', null, "Station-01")
+                                ),
+                                React.createElement('button', {
+                                    onClick: (e) => { e.stopPropagation(); setShowHint(!showHint); },
+                                    className: "hover:text-emerald-500 transition-colors flex items-center gap-1"
+                                },
+                                    React.createElement(Info, { size: 12 }),
+                                    React.createElement('span', null, "Hint")
+                                ),
+                                React.createElement('div', { className: "flex items-center gap-1" },
+                                    React.createElement(Cpu, { size: 12 }),
+                                    React.createElement('span', null, "Kernel 4.2")
+                                )
+                            ),
+                            React.createElement(AnimatePresence, null,
+                                showHint && React.createElement(motion.div, {
+                                    initial: { height: 0, opacity: 0 },
+                                    animate: { height: 'auto', opacity: 1 },
+                                    exit: { height: 0, opacity: 0 },
+                                    className: "overflow-hidden mt-4"
+                                },
+                                    React.createElement('div', { className: "p-3 bg-emerald-500/5 border border-emerald-500/20 rounded text-[10px] text-emerald-500/70 leading-relaxed" },
+                                        "SYSTEM ADVISORY: The access code follows the format [PROJECT]-[ID]. The current active project is NEON, and this is the 7th iteration."
+                                    )
+                                )
+                            )
+                        )
+                    ) : (
+                        React.createElement(motion.div, {
+                            key: "desktop",
+                            initial: { opacity: 0, y: 20 },
+                            animate: { opacity: 1, y: 0 },
+                            className: "w-full max-w-6xl h-[85vh] bg-zinc-900/80 border border-emerald-500/50 rounded-lg backdrop-blur-md flex flex-col z-10 overflow-hidden"
+                        },
+                            /* Top Bar */
+                            React.createElement('div', { className: "bg-emerald-500 text-black p-2 flex justify-between items-center text-xs font-bold uppercase tracking-widest" },
+                                React.createElement('div', { className: "flex items-center gap-4" },
+                                    React.createElement('div', { className: "flex items-center gap-1" },
+                                        React.createElement(Unlock, { size: 14 }),
+                                        React.createElement('span', null, "Access Granted")
+                                    ),
+                                    React.createElement('span', { className: "opacity-50" }, "|"),
+                                    React.createElement('span', null, "User: Admin")
+                                ),
+                                React.createElement('div', { className: "flex items-center gap-4" },
+                                    React.createElement('span', null, new Date().toLocaleDateString()),
+                                    React.createElement('button', {
+                                        onClick: () => window.location.reload(),
+                                        className: "hover:bg-black hover:text-emerald-500 px-2 py-0.5 rounded transition-colors"
+                                    }, "Logout")
+                                )
+                            ),
+                            
+                            /* Main Layout with Sidebar */
+                            React.createElement('div', { className: "flex-1 flex overflow-hidden" },
+                                /* Sidebar Navigation */
+                                React.createElement('div', { className: "w-48 border-r border-emerald-500/20 bg-black/40 p-4 flex flex-col gap-2" },
+                                    React.createElement('button', {
+                                        onClick: () => setActiveTab('profiles'),
+                                        className: `w-full text-left p-2 rounded text-[10px] uppercase tracking-widest transition-colors flex items-center gap-2 ${activeTab === 'profiles' ? 'bg-emerald-500 text-black font-bold' : 'text-emerald-500/60 hover:bg-emerald-500/10'}`
+                                    },
+                                        React.createElement(Database, { size: 14 }),
+                                        "Personnel"
+                                    ),
+                                    React.createElement('button', {
+                                        onClick: () => setActiveTab('matrix'),
+                                        className: `w-full text-left p-2 rounded text-[10px] uppercase tracking-widest transition-colors flex items-center gap-2 ${activeTab === 'matrix' ? 'bg-emerald-500 text-black font-bold' : 'text-emerald-500/60 hover:bg-emerald-500/10'}`
+                                    },
+                                        React.createElement(Terminal, { size: 14 }),
+                                        "Data Matrix"
+                                    )
+                                ),
+
+                                /* Content Area */
+                                React.createElement('div', { className: "flex-1 p-0 overflow-auto bg-black/20 scrollbar-hide" },
+                                    activeTab === 'profiles' ? (
+                                        React.createElement('div', { className: "flex flex-col" },
+                                            personnel.map((person, idx) => (
+                                                React.createElement(motion.div, {
+                                                    key: person.id,
+                                                    initial: { opacity: 0 },
+                                                    whileInView: { opacity: 1 },
+                                                    viewport: { once: true },
+                                                    className: `flex flex-col md:flex-row min-h-[500px] border-b border-emerald-500/10 ${idx % 2 === 1 ? 'md:flex-row-reverse' : ''}`
+                                                },
+                                                    /* Image Section */
+                                                    React.createElement('div', { className: "w-full md:w-1/2 relative overflow-hidden group" },
+                                                        React.createElement('img', { 
+                                                            src: person.img, 
+                                                            alt: person.name, 
+                                                            className: "w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 group-hover:opacity-100 transition-all duration-700",
+                                                            referrerPolicy: "no-referrer" 
+                                                        }),
+                                                        React.createElement('div', { className: "absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-black/80" })
+                                                    ),
+                                                    /* Text Section */
+                                                    React.createElement('div', { className: "w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center space-y-6 bg-zinc-900/40" },
+                                                        React.createElement('div', { className: "space-y-2" },
+                                                            React.createElement('h2', { className: "text-3xl md:text-4xl font-bold tracking-tighter text-emerald-500" }, person.name),
+                                                            React.createElement('p', { className: "text-lg text-emerald-500/60 font-medium italic" }, person.tagline)
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-4" },
+                                                            React.createElement('p', { className: "text-base text-emerald-500/90 font-bold leading-tight" }, person.description),
+                                                            React.createElement('p', { className: "text-sm text-emerald-500/70 leading-relaxed" }, person.details)
+                                                        ),
+                                                        React.createElement('div', { className: "space-y-2 pt-4 border-t border-emerald-500/10" },
+                                                            React.createElement('p', { className: "text-xs uppercase tracking-widest text-emerald-500/40" }),
+                                                            React.createElement('p', { className: "text-sm text-emerald-500/80" }, person.projectInfo)
+                                                        ),
+                                                        React.createElement('p', { className: "text-sm italic text-emerald-500/50 pt-4" }, `"${person.quote}"`)
+                                                    )
+                                                )
+                                            ))
+                                        )
+                                    ) : (
+                                        React.createElement(motion.div, {
+                                            initial: { opacity: 0 },
+                                            animate: { opacity: 1 },
+                                            className: "w-full p-6"
+                                        },
+                                            React.createElement('h2', { className: "text-emerald-500 font-bold text-lg mb-4 uppercase tracking-widest flex items-center gap-2" },
+                                                React.createElement(Terminal, { size: 20 }),
+                                                "MOTIVATION MATRIX"
+                                            ),
+                                            React.createElement('div', { className: "border border-emerald-500/20 rounded-lg overflow-hidden" },
+                                                React.createElement('table', { className: "w-full text-left border-collapse" },
+                                                    React.createElement('thead', null,
+                                                        React.createElement('tr', { className: "bg-emerald-500/10 text-emerald-500 text-[10px] uppercase tracking-widest" },
+                                                            React.createElement('th', { className: "p-3 border-b border-emerald-500/20 w-1/2" }, "Role"),
+                                                            React.createElement('th', { className: "p-3 border-b border-emerald-500/20 w-1/2" }, "Incentive")
+                                                        )
+                                                    ),
+                                                    React.createElement('tbody', null,
+                                                        ROLE_INCENTIVES.map((row, idx) => (
+                                                            React.createElement('tr', { key: idx, className: "text-emerald-500/80 text-xs hover:bg-emerald-500/5 transition-colors" },
+                                                                React.createElement('td', { className: "p-3 border-b border-emerald-500/10 font-mono" }, row.role),
+                                                                React.createElement('td', { className: "p-3 border-b border-emerald-500/10 font-mono" }, row.incentive)
+                                                            )
+                                                        ))
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            ),
+
+                            /* Footer Status */
+                            React.createElement('div', { className: "p-2 border-t border-emerald-500/20 flex justify-between items-center text-[10px] text-emerald-500/40 uppercase tracking-widest bg-black/60" },
+                                React.createElement('div', { className: "flex items-center gap-4" },
+                                    React.createElement('span', null, "CPU: 12%"),
+                                    React.createElement('span', null, "MEM: 4.2GB / 64GB")
+                                ),
+                                React.createElement('div', { className: "flex items-center gap-2" },
+                                    React.createElement('div', { className: "w-2 h-2 rounded-full bg-emerald-500 animate-pulse" }),
+                                    React.createElement('span', null, "System Online")
+                                )
+                            )
+                        )
+                    )
+                ),
+                React.createElement('div', { className: "absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-5" },
+                    React.createElement('div', { className: "absolute top-10 left-10 text-[80px] font-bold rotate-12" }, "010101"),
+                    React.createElement('div', { className: "absolute bottom-20 right-20 text-[60px] font-bold -rotate-12" }, "SYSTEM"),
+                    React.createElement('div', { className: "absolute top-1/2 left-1/4 text-[100px] font-bold opacity-10" }, "NEON")
+                )
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
+    </script>
+</body>
+</html>
+
