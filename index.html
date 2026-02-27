@@ -291,34 +291,54 @@
             };
 
             if (booting) {
-                return React.createElement('div', { className: "min-h-screen bg-black flex flex-col p-8 md:p-16 relative overflow-hidden" },
+                return React.createElement('div', { className: "min-h-screen bg-black flex items-center justify-center p-6 md:p-12 relative overflow-hidden" },
                     React.createElement('div', { className: "crt-overlay" }),
                     React.createElement('div', { className: "scanline" }),
-                    React.createElement('div', { 
-                        ref: scrollRef,
-                        className: "max-w-4xl w-full mx-auto space-y-2 overflow-y-auto max-h-screen scrollbar-hide"
-                    },
-                        bootLogs.map((log, index) => 
-                            React.createElement(motion.div, {
-                                key: index,
-                                initial: { opacity: 0, x: -10 },
-                                animate: { opacity: 1, x: 0 },
-                                className: `text-sm md:text-base ${
-                                    !log ? 'text-emerald-500' :
-                                    (log.includes('WARNING') || log.includes('ERROR')) ? 'text-red-500' : 
-                                    log.includes('SUCCESS') ? 'text-blue-400' : 
-                                    'text-emerald-500'
-                                }`
-                            },
-                                React.createElement('span', { className: "opacity-50 mr-2 text-[10px]" }, `[${new Date().toLocaleTimeString()}]`),
-                                log
+                    React.createElement('div', { className: "relative flex flex-col items-center" },
+                        /* Monitor frame */
+                        React.createElement('div', { className: "bg-zinc-900/80 border-4 border-zinc-800 rounded-xl shadow-[0_0_40px_rgba(16,185,129,0.4)] w-full max-w-4xl aspect-[16/9] flex flex-col overflow-hidden" },
+                            /* Top bezel bar */
+                            React.createElement('div', { className: "h-8 bg-zinc-950/90 border-b border-zinc-700 flex items-center justify-between px-4 text-[10px] uppercase tracking-[0.2em] text-emerald-500/60" },
+                                React.createElement('div', { className: "flex items-center gap-2" },
+                                    React.createElement('span', { className: "w-2 h-2 rounded-full bg-red-500/60" }),
+                                    React.createElement('span', { className: "w-2 h-2 rounded-full bg-yellow-500/60" }),
+                                    React.createElement('span', { className: "w-2 h-2 rounded-full bg-emerald-500/80" }),
+                                    React.createElement('span', null, "NEON-7 // BOOT SEQUENCE")
+                                ),
+                                React.createElement('span', null, "TERMINAL-01")
+                            ),
+                            /* Screen content */
+                            React.createElement('div', { className: "flex-1 bg-black/95 px-5 py-4 overflow-y-auto scrollbar-hide" , ref: scrollRef },
+                                bootLogs.map((log, index) => 
+                                    React.createElement(motion.div, {
+                                        key: index,
+                                        initial: { opacity: 0, x: -10 },
+                                        animate: { opacity: 1, x: 0 },
+                                        className: `text-xs md:text-sm leading-relaxed ${
+                                            !log ? 'text-emerald-500' :
+                                            (log.includes('WARNING') || log.includes('ERROR')) ? 'text-red-500' : 
+                                            log.includes('SUCCESS') ? 'text-blue-400' : 
+                                            'text-emerald-500'
+                                        }`
+                                    },
+                                        React.createElement('span', { className: "opacity-40 mr-2 text-[9px]" }, `[${new Date().toLocaleTimeString()}]`),
+                                        log
+                                    )
+                                ),
+                                React.createElement(motion.div, {
+                                    animate: { opacity: [0, 1] },
+                                    transition: { repeat: Infinity, duration: 0.8 },
+                                    className: "w-2 h-4 bg-emerald-500 inline-block align-middle ml-1"
+                                })
+                            ),
+                            /* Bottom status bar */
+                            React.createElement('div', { className: "h-7 border-t border-zinc-800 bg-zinc-950/90 px-4 flex items-center justify-between text-[9px] uppercase tracking-[0.25em] text-emerald-500/50" },
+                                React.createElement('span', null, "STATUS: INITIALIZING CORE MODULES"),
+                                React.createElement('span', null, "VIDEO MODE: 1024x576 @ 60Hz")
                             )
                         ),
-                        React.createElement(motion.div, {
-                            animate: { opacity: [0, 1] },
-                            transition: { repeat: Infinity, duration: 0.8 },
-                            className: "w-2 h-5 bg-emerald-500 inline-block align-middle ml-1"
-                        })
+                        /* Monitor stand */
+                        React.createElement('div', { className: "mt-4 h-2 w-40 bg-zinc-800 rounded-full shadow-[0_0_30px_rgba(15,23,42,1)]" })
                     )
                 );
             }
